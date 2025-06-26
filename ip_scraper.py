@@ -1,65 +1,54 @@
-import re
 import requests
 from bs4 import BeautifulSoup
+import re
 import os
-from datetime import datetime
 
-def extract_ip_port(url):
-    """从单个页面提取IP:端口"""
+# 目标URL列表
+urls = ['https://api.midtrans.com.freexxx.xhamster.biz.id/?page=1&wildcard=&configType=tls&search=JP'
+        ]
+
+# 正则表达式用于匹配IP:端口
+ip_port_pattern = r'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?::(?:[0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?'
+
+# 检查ip.txt文件是否存在,如果存在则删除它
+if os.path.exists('ip.txt'):
+    os.remove('ip.txt')
+
+# 使用集合来存储IP:端口，自动去重
+unique_ip_ports = set()
+
+for url in urls:
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        
+        # 发送HTTP请求获取网页内容
+        headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
+        # 使用BeautifulSoup解析HTML
         soup = BeautifulSoup(response.text, 'html.parser')
-        text = soup.get_text()
         
-        ip_port_pattern = r'\b(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):(?:[0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])\b'
-        
-        matches = re.findall(ip_port_pattern, text)
-        return list(set(matches))
-        
-    except Exception as e:
-        print(f"抓取 {url} 时出错: {str(e)}")
-        return []
-
-def save_to_file(ip_list, filename='ip.txt'):
-    """保存结果到文件"""
-    with open(filename, 'w') as f:
-        f.write(f"# 最后更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-        for ip in ip_list:
-            f.write(f"{ip}\n")
-
-if __name__ == "__main__":
-    # 从环境变量读取目标URL，或使用默认值
-    target_urls = os.getenv('TARGET_URLS', '').split(',')
-    if not target_urls or target_urls == ['']:
-        target_urls = [
-            "https://api.midtrans.com.freexxx.xhamster.biz.id/?page=1&wildcard=&configType=tls&search=JP",
-            "https://api.midtrans.com.freexxx.xhamster.biz.id/?page=2&wildcard=&configType=tls&search=JP",
-            "https://api.midtrans.com.freexxx.xhamster.biz.id/?page=3&wildcard=&configType=tls&search=JP"
-        ]
-    
-    print(f"开始抓取 {len(target_urls)} 个目标URL...")
-    
-    all_ip_ports = []
-    for url in target_urls:
-        url = url.strip()
-        if not url:
-            continue
+        # 根据网站的不同结构找到包含IP地址的元素
+        if url == 'https://api.midtrans.com.freexxx.xhamster.biz.id/?page=1&wildcard=&configType=tls&search=JP':
+            # 特殊处理cloudflare.html的表格结构
+            for tr in soup.find_all('tr'):
+                tds = tr.find_all('td')
+                if len(tds) >= 2:  # 确保有足够的列
+                    ip_port = f"{tds[0].get_text(strip=True)}:{tds[1].get_text(strip=True)}"
+                    if re.fullmatch(ip_port_pattern, ip_port):
+                        unique_ip_ports.add(ip_port)
+        else:
+            # 其他网站的处理方式
+            text = soup.get_text()
+            matches = re.findall(ip_port_pattern, text)
+            unique_ip_ports.update(matches)
             
-        print(f"\n正在处理: {url}")
-        ip_ports = extract_ip_port(url)
-        if ip_ports:
-            print(f"找到 {len(ip_ports)} 个IP:端口")
-            all_ip_ports.extend(ip_ports)
-    
-    if all_ip_ports:
-        unique_ip_ports = sorted(list(set(all_ip_ports)))
-        print(f"\n找到 {len(unique_ip_ports)} 个唯一IP:端口")
-        save_to_file(unique_ip_ports)
-    else:
-        print("未找到任何IP:端口信息")
+    except Exception as e:
+        print(f"处理 {url} 时出错: {str(e)}")
+        continue
+
+# 将去重后的IP:端口写入文件
+with open('ip.txt', 'w') as file:
+    for ip_port in sorted(unique_ip_ports):
+        file.write(ip_port + '\n')
+
+print(f'共找到 {len(unique_ip_ports)} 个唯一IP:端口组合，已保存到ip.txt文件中。')
