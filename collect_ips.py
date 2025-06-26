@@ -1,52 +1,62 @@
+import re
 import requests
 from bs4 import BeautifulSoup
-import re
-import os
 
-# 目标URL列表
-urls = ['https://api.midtrans.com.freexxx.xhamster.biz.id/?page=1&wildcard=&conf', 
-        'https://api.midtrans.com.freexxx.xhamster.biz.id/?page=2&wildcard=&conf',
-        'https://api.midtrans.com.freexxx.xhamster.biz.id/?page=3&wildcard=&conf'
-        ]
-
-# 正则表达式用于匹配IP地址
-ip_pattern = r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
-
-# 检查ip.txt文件是否存在,如果存在则删除它
-if os.path.exists('ip.txt'):
-    os.remove('ip.txt')
-
-# 使用集合来存储IP地址，自动去重
-unique_ips = set()
-
-for url in urls:
-    # 发送HTTP请求获取网页内容
-    response = requests.get(url)
-    
-    # 使用BeautifulSoup解析HTML
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # 根据网站的不同结构找到包含IP地址的元素
-    if url == 'https://api.midtrans.com.freexxx.xhamster.biz.id/?page=1&wildcard=&conf':
-        elements = soup.find_all('tr')
-    elif url == 'https://api.midtrans.com.freexxx.xhamster.biz.id/?page=2&wildcard=&conf':
-        elements = soup.find_all('tr')
-    elif url == 'https://api.midtrans.com.freexxx.xhamster.biz.id/?page=3&wildcard=&conf':
-        elements = soup.find_all('tr')
-    else:
-        elements = soup.find_all('li')
-    
-    # 遍历所有元素,查找IP地址
-    for element in elements:
-        element_text = element.get_text()
-        ip_matches = re.findall(ip_pattern, element_text)
+def extract_ip_port(url):
+    """从单个页面提取IP:端口"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
         
-        # 将找到的IP地址添加到集合中（自动去重）
-        unique_ips.update(ip_matches)
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        text = soup.get_text()
+        
+        # 精确的IP:端口正则表达式
+        ip_port_pattern = r'\b(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):(?:[0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])\b'
+        
+        matches = re.findall(ip_port_pattern, text)
+        return list(set(matches))  # 去重
+        
+    except Exception as e:
+        print(f"抓取 {url} 时出错: {str(e)}")
+        return []
 
-# 将去重后的IP地址写入文件
-with open('ip.txt', 'w') as file:
-    for ip in unique_ips:
-        file.write(ip + '\n')
+def save_to_file(ip_list, filename='ip.txt'):
+    """保存结果到文件"""
+    with open(filename, 'w') as f:
+        for ip in ip_list:
+            f.write(f"{ip}\n")
+    print(f"已保存 {len(ip_list)} 个IP地址到 {filename}")
 
-print(f'共找到 {len(unique_ips)} 个唯一IP地址，已保存到ip.txt文件中。')
+if __name__ == "__main__":
+    # 在这里填写你的目标网址列表
+    target_urls = [
+        "https://api.midtrans.com.freexxx.xhamster.biz.id/?page=1&wildcard=&configType=tls&search=JP",
+        "https://api.midtrans.com.freexxx.xhamster.biz.id/?page=2&wildcard=&configType=tls&search=JP",
+        "https://api.midtrans.com.freexxx.xhamster.biz.id/?page=3&wildcard=&configType=tls&search=JP"
+        # 添加更多具体网址...
+    ]
+    
+    all_ip_ports = []
+    
+    for url in target_urls:
+        print(f"正在处理: {url}")
+        ip_ports = extract_ip_port(url)
+        if ip_ports:
+            print(f"找到 {len(ip_ports)} 个IP:端口")
+            all_ip_ports.extend(ip_ports)
+    
+    if all_ip_ports:
+        # 最终去重
+        unique_ip_ports = list(set(all_ip_ports))
+        print("\n找到的所有唯一IP地址和端口:")
+        for item in unique_ip_ports:
+            print(item)
+        
+        save_to_file(unique_ip_ports)
+    else:
+        print("未找到任何IP:端口信息")
