@@ -4,7 +4,7 @@ import re
 import os
 
 # 目标URL列表
-urls = ['https://api.midtrans.com.freexxx.xhamster.biz.id/?page=1&wildcard=&configType=tls&search=JP'
+urls = ['https://proxy.yudhy.net/?page=1&search=SG'
         ]
 
 # 正则表达式用于匹配IP:端口
@@ -28,7 +28,7 @@ for url in urls:
         soup = BeautifulSoup(response.text, 'html.parser')
         
         # 根据网站的不同结构找到包含IP地址的元素
-        if url == 'https://api.midtrans.com.freexxx.xhamster.biz.id/?page=1&wildcard=&configType=tls&search=JP':
+        if url == 'https://proxy.yudhy.net/?page=1&search=SG':
             # 特殊处理cloudflare.html的表格结构
             for tr in soup.find_all('tr'):
                 tds = tr.find_all('td')
